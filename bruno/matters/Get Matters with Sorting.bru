@@ -1,0 +1,16 @@
+meta {
+  name: Get Matters with Sorting
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/matters?sortBy=created_at&sortOrder=asc
+  body: none
+  auth: none
+}
+
+params:query {
+  sortBy: created_at
+  sortOrder: asc
+}

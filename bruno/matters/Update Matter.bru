@@ -1,0 +1,17 @@
+meta {
+  name: Update Matter
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/matters/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "status": "In Progress"
+  }
+}
