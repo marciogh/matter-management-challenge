@@ -50,6 +50,34 @@ docker exec -it mypostgres psql -U postgres -d matter_management
 
 ---
 
+## Search Strategy Decision: Multi-Token OR Search (All Fields)
+
+### Layer 1 (Current): Multi-Token ILIKE Search
+**For 10K matters** - Simple token-based OR search across all field types.
+- Tokenize by whitespace: `"Smith 500"` → `["Smith", "500"]`
+- Search each token in ALL fields using `ILIKE '%token%'`
+- Combine with OR logic (matches ANY token in ANY field)
+- Uses existing pg_trgm GIN indexes for text fields
+
+### Layer 2 (Future - 100K matters): PostgreSQL tsvector
+**Upgrade to native full-text search** with better performance and relevance ranking.
+- Add `tsvector` column to aggregate searchable content
+- Use `to_tsquery()` for advanced operators (AND/OR/phrase matching)
+- Maintains comprehensive search while adding relevance scoring
+- GIN index on tsvector provides ~10x performance improvement
+
+### Layer 3 (Future - 1M+ matters): Elasticsearch
+**For massive scale** with advanced features.
+- Dedicated search cluster with horizontal scaling
+- Advanced relevance algorithms (BM25)
+- Fuzzy matching, typo tolerance, synonyms
+- Faceted search and aggregations
+- Sub-10ms response times at scale
+
+**Decision Rationale:** Users expect comprehensive "Google-style" search, not type-aware filtering. Multi-token OR provides simple, predictable behavior matching user mental models.
+
+---
+
 ## Backend Implementation
 
 ### New File: `backend/src/ticketing/matter/utils/search_query_builder.ts`
@@ -87,47 +115,43 @@ export async function buildSearchQuery(
     };
   }
 
-  const trimmedSearch = searchTerm.trim();
-  const searchPattern = `%${trimmedSearch}%`;
-  const paramIndex = startParamIndex;
-
-  // Build comprehensive search conditions
-  const conditions: string[] = [];
+  // Tokenize search term by whitespace
+  const tokens = searchTerm.trim().split(/\s+/);
   const params: string[] = [];
+  let paramIndex = startParamIndex;
 
-  // Search in text fields (text_value and string_value)
-  conditions.push(`ttfv_search.text_value ILIKE $${paramIndex}`);
-  conditions.push(`ttfv_search.string_value ILIKE $${paramIndex}`);
-  params.push(searchPattern);
+  // Build search conditions for each token (OR logic - match ANY token in ANY field)
+  const tokenConditions = tokens.map((token) => {
+    const searchPattern = `%${token}%`;
+    params.push(searchPattern);
 
-  // Search in number fields (cast to text)
-  conditions.push(`CAST(ttfv_search.number_value AS TEXT) ILIKE $${paramIndex}`);
+    const conditions: string[] = [];
+    const currentParam = `$${paramIndex}`;
+    paramIndex++;
 
-  // Search in date fields (format as ISO date string)
-  conditions.push(`TO_CHAR(ttfv_search.date_value, 'YYYY-MM-DD') ILIKE $${paramIndex}`);
+    // Search this token in ALL field types
+    conditions.push(`ttfv_search.text_value ILIKE ${currentParam}`);
+    conditions.push(`ttfv_search.string_value ILIKE ${currentParam}`);
+    conditions.push(`CAST(ttfv_search.number_value AS TEXT) ILIKE ${currentParam}`);
+    conditions.push(`TO_CHAR(ttfv_search.date_value, 'YYYY-MM-DD') ILIKE ${currentParam}`);
+    conditions.push(`CAST((ttfv_search.currency_value->>'amount') AS TEXT) ILIKE ${currentParam}`);
+    conditions.push(`CONCAT(u_search.first_name, ' ', u_search.last_name) ILIKE ${currentParam}`);
+    conditions.push(`tfo_search.label ILIKE ${currentParam}`);
+    conditions.push(`tfso_search.label ILIKE ${currentParam}`);
 
-  // Search in boolean fields (match 'true', 'false', or visual symbols)
-  const lowerSearch = trimmedSearch.toLowerCase();
-  if (lowerSearch.includes('true') || lowerSearch.includes('yes') || lowerSearch.includes('✓')) {
-    conditions.push(`ttfv_search.boolean_value = true`);
-  }
-  if (lowerSearch.includes('false') || lowerSearch.includes('no') || lowerSearch.includes('✗')) {
-    conditions.push(`ttfv_search.boolean_value = false`);
-  }
+    // Boolean: match if token contains 'true', 'yes', 'false', 'no'
+    const lowerToken = token.toLowerCase();
+    if (lowerToken.includes('true') || lowerToken.includes('yes') || lowerToken.includes('✓')) {
+      conditions.push(`ttfv_search.boolean_value = true`);
+    }
+    if (lowerToken.includes('false') || lowerToken.includes('no') || lowerToken.includes('✗')) {
+      conditions.push(`ttfv_search.boolean_value = false`);
+    }
 
-  // Search in currency amount (extract from JSONB)
-  conditions.push(`CAST((ttfv_search.currency_value->>'amount') AS TEXT) ILIKE $${paramIndex}`);
+    return `(${conditions.join(' OR ')})`;
+  });
 
-  // Search in user names (join to users table)
-  conditions.push(`CONCAT(u_search.first_name, ' ', u_search.last_name) ILIKE $${paramIndex}`);
-
-  // Search in select option labels
-  conditions.push(`tfo_search.label ILIKE $${paramIndex}`);
-
-  // Search in status option labels
-  conditions.push(`tfso_search.label ILIKE $${paramIndex}`);
-
-  // Combine all conditions with OR
+  // Combine all token conditions with OR (match ANY token)
   const searchCondition = `
     AND EXISTS (
       SELECT 1
@@ -139,7 +163,7 @@ export async function buildSearchQuery(
         ON ttfv_search.status_reference_value_uuid = tfso_search.id
       WHERE ttfv_search.ticket_id = tt.id
         AND (
-          ${conditions.join('\n          OR ')}
+          ${tokenConditions.join('\n          OR ')}
         )
     )
   `;
@@ -151,6 +175,12 @@ export async function buildSearchQuery(
   };
 }
 ```
+
+**Multi-Token Behavior:**
+- `"Smith"` → Finds matters with "Smith" in ANY field (name, subject, case number, etc.)
+- `"Smith 500"` → Finds matters with "Smith" OR "500" in ANY field
+- `"John Smith 500"` → Finds matters with "John" OR "Smith" OR "500" in ANY field
+- Comprehensive, predictable, matches user expectations (Google-style search)
 
 **Why EXISTS Subquery?**
 - Avoids cartesian products with the sort JOINs (ttfv_sort uses same table)
