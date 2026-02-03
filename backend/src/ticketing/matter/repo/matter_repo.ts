@@ -5,6 +5,7 @@ import { PoolClient } from 'pg';
 import { getSortFieldConfig } from '../utils/sort_field_mapper.js';
 import { buildSortQuery } from '../utils/sort_query_builder.js';
 import { getFieldIdByName } from '../utils/field_id_resolver.js';
+import { buildSearchQuery } from '../utils/search_query_builder.js';
 
 export class MatterRepo {
   /**
@@ -36,11 +37,14 @@ export class MatterRepo {
     const client = await pool.connect();
 
     try {
-      // TODO: Implement search condition
-      // Currently search is not implemented - add ILIKE queries with pg_trgm
-      const searchCondition = '';
+      // Build search condition using multi-token OR logic
       const queryParams: (string | number)[] = [];
-      const paramIndex = 1;
+      let paramIndex = 1;
+
+      const searchResult = await buildSearchQuery(params.search || '', client, paramIndex);
+      const searchCondition = searchResult.searchCondition;
+      queryParams.push(...searchResult.searchParams);
+      paramIndex += searchResult.searchParams.length;
 
       // Determine sort column and build dynamic JOIN/ORDER BY
       let sortJoinClause = '';

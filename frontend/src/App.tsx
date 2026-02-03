@@ -1,14 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMatters } from './hooks/useMatters';
 import { MatterTable } from './components/MatterTable';
 import { Pagination } from './components/Pagination';
+import { SearchBar } from './components/SearchBar';
 
 function App() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [search] = useState(''); // TODO: Implement search state management
+  const [searchInput, setSearchInput] = useState('');  // Immediate input value
+  const [search, setSearch] = useState('');             // Debounced value sent to API
+
+  // Debounce search input (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1); // Reset to first page when search changes
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const { data, total, totalPages, loading, error } = useMatters({
     page,
@@ -44,22 +56,23 @@ function App() {
           </div>
 
           <div className="mb-4">
-            {/* TODO: Implement search functionality */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
-                    <strong>Assessment Task:</strong> Search functionality needs to be implemented. Add a search bar component that searches across all fields including cycle times and SLA.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <SearchBar
+              value={searchInput}
+              onChange={setSearchInput}
+              isLoading={loading}
+              placeholder="Search matters by case number, subject, status, assignee, or any field..."
+            />
           </div>
+
+          {search && !loading && (
+            <div className="mb-4 text-sm text-gray-600">
+              {total > 0 ? (
+                <span>Found <strong>{total}</strong> matter{total !== 1 ? 's' : ''} matching "{search}"</span>
+              ) : (
+                <span>No matters found matching "{search}"</span>
+              )}
+            </div>
+          )}
 
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             {loading && (
