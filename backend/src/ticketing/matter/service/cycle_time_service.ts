@@ -1,33 +1,74 @@
 import { config } from '../../../utils/config.js';
 import { SLAStatus, CycleTime } from '../../types.js';
+import pool from '../../../db/pool.js';
+
+/**
+ * Format milliseconds into human-readable duration string.
+ * Pure function for easy unit testing.
+ */
+export function formatDuration(durationMs: number): string {
+  if (durationMs < 60 * 1000) {
+    return '< 1m';
+  }
+
+  const totalMinutes = Math.floor(durationMs / (60 * 1000));
+  const totalHours = Math.floor(totalMinutes / 60);
+  const totalDays = Math.floor(totalHours / 24);
+
+  const minutes = totalMinutes % 60;
+  const hours = totalHours % 24;
+
+  if (totalDays > 0) {
+    return hours > 0 ? `${totalDays}d ${hours}h` : `${totalDays}d`;
+  }
+
+  if (totalHours > 0) {
+    return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+  }
+
+  return `${minutes}m`;
+}
+
+/**
+ * Determine SLA status based on resolution time and completion state.
+ * Pure function for easy unit testing.
+ */
+export function determineSLA(
+  resolutionTimeMs: number | null,
+  isCompleted: boolean,
+  thresholdMs: number,
+): SLAStatus {
+  if (!isCompleted) {
+    return 'In Progress';
+  }
+
+  if (resolutionTimeMs === null) {
+    return 'In Progress';
+  }
+
+  return resolutionTimeMs <= thresholdMs ? 'Met' : 'Breached';
+}
+
+/**
+ * Calculate resolution time between start and end timestamps.
+ * Pure function for easy unit testing.
+ */
+export function calculateResolutionTime(
+  startedAt: Date | null,
+  completedAt: Date | null,
+): number | null {
+  if (!startedAt) {
+    return null;
+  }
+
+  const endTime = completedAt ? completedAt.getTime() : Date.now();
+  return endTime - startedAt.getTime();
+}
 
 /**
  * CycleTimeService - Calculate resolution times and SLA status for matters
- * 
- * TODO: Implement this service to:
- * 1. Calculate resolution time from "To Do" → "Done" status transitions
- * 2. Determine SLA status based on resolution time vs threshold
- * 3. Format durations in human-readable format (e.g., "2h 30m", "3d 5h")
- * 
- * Requirements:
- * - Query ticketing_cycle_time_histories table
- * - Join with status groups to identify "To Do", "In Progress", "Done" statuses
- * - Calculate time between first transition and "Done" transition
- * - For in-progress matters, calculate time from first transition to now
- * - Compare against SLA_THRESHOLD_HOURS (default: 8 hours)
- * 
- * SLA Status Logic:
- * - "In Progress": Matter not yet in "Done" status
- * - "Met": Resolved within threshold (≤ 8 hours)
- * - "Breached": Resolved after threshold (> 8 hours)
- * 
- * Consider:
- * - Performance for 10,000+ matters
- * - Caching strategies for high load
- * - Database query optimization
  */
 export class CycleTimeService {
-  // SLA threshold in milliseconds (candidates will use this in their implementation)
   private _slaThresholdMs: number;
 
   constructor() {
@@ -35,33 +76,72 @@ export class CycleTimeService {
   }
 
   async calculateCycleTimeAndSLA(
-    _ticketId: string,
-    _currentStatusGroupName: string | null,
+    ticketId: string,
+    currentStatusGroupName: string | null,
   ): Promise<{ cycleTime: CycleTime; sla: SLAStatus }> {
-    // TODO: Implement cycle time calculation
-    // See requirements in class documentation above
-    
-    // Placeholder return - replace with actual implementation
+    const { startedAt, completedAt } = await this._queryTransitions(ticketId);
+
+    // No history - return N/A
+    if (!startedAt) {
+      return {
+        cycleTime: {
+          resolutionTimeMs: null,
+          resolutionTimeFormatted: 'N/A',
+          isInProgress: false,
+          startedAt: null,
+          completedAt: null,
+        },
+        sla: 'In Progress',
+      };
+    }
+
+    const isCompleted = currentStatusGroupName === 'Done';
+    const resolutionTimeMs = calculateResolutionTime(startedAt, isCompleted ? completedAt : null);
+    const sla = determineSLA(resolutionTimeMs, isCompleted, this._slaThresholdMs);
+    const resolutionTimeFormatted = resolutionTimeMs !== null
+      ? formatDuration(resolutionTimeMs)
+      : 'N/A';
+
     return {
       cycleTime: {
-        resolutionTimeMs: null,
-        resolutionTimeFormatted: 'N/A',
-        isInProgress: false,
-        startedAt: null,
-        completedAt: null,
+        resolutionTimeMs,
+        resolutionTimeFormatted,
+        isInProgress: !isCompleted,
+        startedAt,
+        completedAt: isCompleted ? completedAt : null,
       },
-      sla: 'In Progress',
+      sla,
     };
   }
 
-  // Helper method for formatting durations (candidates will implement this)
-  private _formatDuration(_durationMs: number, _isInProgress: boolean): string {
-    // TODO: Implement duration formatting
-    // Format as "2h 30m", "3d 5h", etc.
-    // Prefix with "In Progress: " if matter is not complete
-    return 'N/A';
+  /**
+   * Query cycle time history to get start and completion timestamps.
+   * Uses PostgreSQL FILTER clause for efficient single-query extraction.
+   */
+  private async _queryTransitions(
+    ticketId: string,
+  ): Promise<{ startedAt: Date | null; completedAt: Date | null }> {
+    const query = `
+      SELECT
+        MIN(tcth.transitioned_at) AS started_at,
+        MIN(tcth.transitioned_at) FILTER (WHERE tfsg.name = 'Done') AS completed_at
+      FROM ticketing_cycle_time_histories tcth
+      JOIN ticketing_field_status_options tfso ON tcth.to_status_id = tfso.id
+      JOIN ticketing_field_status_groups tfsg ON tfso.group_id = tfsg.id
+      WHERE tcth.ticket_id = $1
+    `;
+
+    const result = await pool.query(query, [ticketId]);
+
+    if (result.rows.length === 0 || !result.rows[0].started_at) {
+      return { startedAt: null, completedAt: null };
+    }
+
+    return {
+      startedAt: new Date(result.rows[0].started_at),
+      completedAt: result.rows[0].completed_at ? new Date(result.rows[0].completed_at) : null,
+    };
   }
 }
 
 export default CycleTimeService;
-

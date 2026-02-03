@@ -4,6 +4,7 @@ import {
   formatDate,
   formatBoolean,
   getStatusBadgeColor,
+  getSLABadgeColor,
 } from '../utils/formatting';
 
 interface MatterTableProps {
@@ -130,11 +131,9 @@ export function MatterTable({ matters, sortBy, sortOrder, onSort }: MatterTableP
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Resolution Time
-              <span className="text-xs text-orange-600 ml-2">(TODO)</span>
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               SLA
-              <span className="text-xs text-orange-600 ml-2">(TODO)</span>
             </th>
           </tr>
         </thead>
@@ -167,15 +166,17 @@ export function MatterTable({ matters, sortBy, sortOrder, onSort }: MatterTableP
               <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                 {renderFieldValue(matter, 'Urgent')}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                {/* TODO: Display formatted resolution time (e.g., "2h 30m", "3d 5h") */}
-                <span className="italic">Not implemented</span>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {matter.cycleTime?.resolutionTimeFormatted || 'N/A'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                {/* TODO: Display SLA badge (In Progress/Met/Breached) with appropriate colors */}
-                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500 italic">
-                  Not implemented
-                </span>
+                {matter.sla ? (
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getSLABadgeColor(matter.sla)}`}>
+                    {matter.sla}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">N/A</span>
+                )}
               </td>
             </tr>
           ))}

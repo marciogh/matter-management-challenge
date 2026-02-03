@@ -44,6 +44,7 @@ services:
       dockerfile: Dockerfile
       target: builder
     container_name: matter-management-backend-dev
+    user: root
     environment:
       DATABASE_URL: postgres://matter:matter@postgres:5432/matter_db
       PORT: 3000
@@ -54,7 +55,7 @@ services:
       - "3000:3000"
     volumes:
       - ./backend/src:/app/src
-    command: npm run dev
+    command: npx tsx watch src/app.ts
     depends_on:
       postgres:
         condition: service_healthy
