@@ -2,6 +2,9 @@ import pool from '../../../db/pool.js';
 import { Matter, MatterListParams, FieldValue, UserValue, CurrencyValue, StatusValue } from '../../types.js';
 import logger from '../../../utils/logger.js';
 import { PoolClient } from 'pg';
+import { getSortFieldConfig } from '../utils/sort_field_mapper.js';
+import { buildSortQuery } from '../utils/sort_query_builder.js';
+import { getFieldIdByName } from '../utils/field_id_resolver.js';
 
 export class MatterRepo {
   /**
@@ -39,19 +42,25 @@ export class MatterRepo {
       const queryParams: (string | number)[] = [];
       const paramIndex = 1;
 
-      // Determine sort column
+      // Determine sort column and build dynamic JOIN/ORDER BY
+      let sortJoinClause = '';
       let orderByClause = 'tt.created_at DESC';
-      if (sortBy === 'created_at') {
-        orderByClause = `tt.created_at ${sortOrder.toUpperCase()}`;
-      } else if (sortBy === 'updated_at') {
-        orderByClause = `tt.updated_at ${sortOrder.toUpperCase()}`;
+
+      const sortConfig = getSortFieldConfig(sortBy);
+      if (sortConfig) {
+        let fieldId: string | undefined;
+        if (sortConfig.fieldName) {
+          fieldId = (await getFieldIdByName(sortConfig.fieldName)) ?? undefined;
+        }
+        const sortQuery = buildSortQuery(sortConfig, sortOrder, fieldId);
+        sortJoinClause = sortQuery.joinClause;
+        orderByClause = sortQuery.orderByClause;
       }
 
       // Get total count
       const countQuery = `
-        SELECT COUNT(DISTINCT tt.id) as total
+        SELECT COUNT(*) as total
         FROM ticketing_ticket tt
-        LEFT JOIN ticketing_ticket_field_value ttfv ON tt.id = ttfv.ticket_id
         WHERE 1=1 ${searchCondition}
       `;
       
@@ -60,9 +69,9 @@ export class MatterRepo {
 
       // Get matters
       const mattersQuery = `
-        SELECT DISTINCT tt.id, tt.board_id, tt.created_at, tt.updated_at
+        SELECT tt.id, tt.board_id, tt.created_at, tt.updated_at
         FROM ticketing_ticket tt
-        LEFT JOIN ticketing_ticket_field_value ttfv ON tt.id = ttfv.ticket_id
+        ${sortJoinClause}
         WHERE 1=1 ${searchCondition}
         ORDER BY ${orderByClause}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}

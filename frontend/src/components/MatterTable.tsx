@@ -99,42 +99,29 @@ export function MatterTable({ matters, sortBy, sortOrder, onSort }: MatterTableP
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th
-              onClick={() => onSort('subject')}
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-            >
-              <div className="flex items-center gap-1">
-                Subject
-                {renderSortIcon('subject')}
-              </div>
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Case Number
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Assigned To
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Priority
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Contract Value
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Due Date
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Urgent
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Resolution Time
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              SLA
-            </th>
+            {([
+              { key: 'subject',        label: 'Subject' },
+              { key: 'Case Number',    label: 'Case Number' },
+              { key: 'Status',         label: 'Status' },
+              { key: 'Assigned To',    label: 'Assigned To' },
+              { key: 'Priority',       label: 'Priority' },
+              { key: 'Contract Value', label: 'Contract Value' },
+              { key: 'Due Date',       label: 'Due Date' },
+              { key: 'Urgent',         label: 'Urgent' },
+              { key: 'resolutionTime', label: 'Resolution Time' },
+              { key: 'sla',            label: 'SLA' },
+            ] as const).map(({ key, label }) => (
+              <th
+                key={key}
+                onClick={() => onSort(key)}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-1">
+                  {label}
+                  {renderSortIcon(key)}
+                </div>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">

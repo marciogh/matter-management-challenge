@@ -165,3 +165,9 @@ CREATE INDEX idx_ticket_field_value_number ON ticketing_ticket_field_value(numbe
 CREATE INDEX idx_ticket_field_value_date ON ticketing_ticket_field_value(date_value);
 CREATE INDEX idx_ticketing_ticket_created_at ON ticketing_ticket(created_at);
 
+-- Composite indexes for EAV sort performance (field_id + value column)
+CREATE INDEX idx_ttfv_sort_number ON ticketing_ticket_field_value(ticket_field_id, number_value);
+CREATE INDEX idx_ttfv_sort_date ON ticketing_ticket_field_value(ticket_field_id, date_value);
+CREATE INDEX idx_ttfv_sort_string ON ticketing_ticket_field_value(ticket_field_id, string_value);
+CREATE INDEX idx_ttfv_sort_boolean ON ticketing_ticket_field_value(ticket_field_id, boolean_value);
+

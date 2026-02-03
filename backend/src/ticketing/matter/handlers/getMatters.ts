@@ -3,10 +3,17 @@ import { MatterService } from '../service/matter_service.js';
 import { z } from 'zod';
 import logger from '../../../utils/logger.js';
 
+const VALID_SORT_FIELDS = [
+  'created_at', 'updated_at', 'subject',
+  'Case Number', 'Status', 'Assigned To', 'Priority',
+  'Contract Value', 'Due Date', 'Urgent',
+  'resolutionTime', 'sla',
+];
+
 const querySchema = z.object({
   page: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 1)),
   limit: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 25)),
-  sortBy: z.string().optional().default('created_at'),
+  sortBy: z.enum(VALID_SORT_FIELDS as [string, ...string[]]).optional().default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   search: z.string().optional().default(''),
 });
