@@ -44,7 +44,6 @@ services:
       dockerfile: Dockerfile
       target: builder
     container_name: matter-management-backend-dev
-    user: root
     environment:
       DATABASE_URL: postgres://matter:matter@postgres:5432/matter_db
       PORT: 3000

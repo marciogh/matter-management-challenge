@@ -29,12 +29,15 @@ COPY package*.json ./
 # Install production dependencies only
 RUN npm ci --only=production
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
+
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
+
+# Set ownership for the nodejs user
+RUN chown -R nodejs:nodejs /app
 
 USER nodejs
 
