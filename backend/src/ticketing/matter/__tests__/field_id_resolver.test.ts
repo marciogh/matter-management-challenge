@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getFieldIdByName, clearFieldIdCache } from '../utils/field_id_resolver.js';
 import pool from '../../../db/pool.js';
+import type { QueryResult } from 'pg';
+
+type FieldRow = { id: string; name: string };
 
 vi.mock('../../../db/pool.js', () => ({
   default: {
@@ -21,7 +24,7 @@ describe('field_id_resolver', () => {
         { id: 'uuid-2', name: 'subject' },
         { id: 'uuid-3', name: 'Status' },
       ],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     const id = await getFieldIdByName('Case Number');
     expect(id).toBe('uuid-1');
@@ -38,7 +41,7 @@ describe('field_id_resolver', () => {
         { id: 'uuid-2', name: 'subject' },
         { id: 'uuid-3', name: 'Status' },
       ],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     await getFieldIdByName('Case Number');
     const subjectId = await getFieldIdByName('subject');
@@ -54,7 +57,7 @@ describe('field_id_resolver', () => {
         { id: 'uuid-1', name: 'subject' },
         { id: 'uuid-2', name: 'Status' },
       ],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     await getFieldIdByName('subject');
     await getFieldIdByName('subject');
@@ -68,7 +71,7 @@ describe('field_id_resolver', () => {
       rows: [
         { id: 'uuid-1', name: 'subject' },
       ],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     const id = await getFieldIdByName('nonexistent');
     expect(id).toBeNull();
@@ -78,10 +81,10 @@ describe('field_id_resolver', () => {
     vi.mocked(pool.query)
       .mockResolvedValueOnce({
         rows: [{ id: 'uuid-1', name: 'subject' }],
-      } as any)
+      } as Partial<QueryResult<FieldRow>>)
       .mockResolvedValueOnce({
         rows: [{ id: 'uuid-2', name: 'subject' }],
-      } as any);
+      } as Partial<QueryResult<FieldRow>>);
 
     const id1 = await getFieldIdByName('subject');
     expect(id1).toBe('uuid-1');
@@ -96,7 +99,7 @@ describe('field_id_resolver', () => {
   it('handles empty result set', async () => {
     vi.mocked(pool.query).mockResolvedValueOnce({
       rows: [],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     const id = await getFieldIdByName('any-field');
     expect(id).toBeNull();
@@ -111,7 +114,7 @@ describe('field_id_resolver', () => {
         { id: 'uuid-4', name: 'Priority' },
         { id: 'uuid-5', name: 'Assigned To' },
       ],
-    } as any);
+    } as Partial<QueryResult<FieldRow>>);
 
     // Load cache first
     const firstId = await getFieldIdByName('subject');
