@@ -1,3 +1,110 @@
+# Matter Management System
+
+## AI Usage Disclosure
+
+This README has 100% manually written by me.
+
+This assessment has been completed with support of Claude Sonnet 4.5 model, via Visual Studio Claude Code for VS Code. Anthropic plugin.
+
+I have more than 20 years of software engineering experience. In the last 6 months I started leveraging AI into coding, with a mix feeling of amazement and frustration on how I'm more and more being outperformed by AI in general code quality and productivity.
+
+The combination of my design, testing and project management experience and advanced IA usage has producing extremely positive yields in my current job position.
+
+This is my current development workflow:
+
+1) Breakdown the project into manageable chunks (for this assessment, it was already done)
+2) Create and refine a plan MD file
+3) Implement the plan
+4) Test and refine the implementation
+5) Summarize the implementation into another MD file
+
+For this assessment, these artefacts have been produced:
+
+- [TASK-1-CYCLETIME.md](TASK-1-CYCLETIME.md)
+- [TASK-1-CYCLETIME-SUMMARY.md](TASK-1-CYCLETIME-SUMMARY.md)
+- [TASK-2-SORTING.md](TASK-2-SORTING.md)
+- [TASK-2-SORTING-SUMMARY.md](TASK-2-SORTING-SUMMARY.md)
+- [TASK-3-SEARCH.md](TASK-3-SEARCH.md)
+- [TASK-3-SEARCH-SUMMARY.md](TASK-3-SEARCH-SUMMARY.md)
+- [TASK-DOCKER-PACKAGE-JSON.md](TASK-DOCKER-PACKAGE-JSON.md) issue I had with Docker
+- [TASK-STORE-COMPUTED-SLA-DATA.md](TASK-STORE-COMPUTED-SLA-DATA.md) exploring storing computing fields, not implemented
+
+# Cycle Time Tracking & SLA Calculation
+
+When I started this task, straight away I identified it would be a sorting issue if it wasn't stored in the database. However, due time constraints for the assessment and also to deep dive in the system functionality and design, I decided to not implement it, and postpone the problem.
+
+The tradeoff is documented on Sorting session below.
+
+# Sorting
+
+Sorting EAV fields implementation followed a common pattern using LEFT JOIN from `ticketing_ticket` to `ticketing_ticket_field_value`, with a `sort_query_builder.ts` dealing with different field schema scenarios.
+
+## Potential improvements 
+
+- I'm using COUNT query to provide precise pagination data. For larger datasets, we could switch to a infinite scroll / cursor solution.
+- Postgres is performing in memory sort due the lack of indexes on field values. Example for a `subject(text)` sort:
+ ```
+ Sort  (cost=1866.20..1868.45 rows=900 width=62) (actual time=23.655..24.130 rows=10000 loops=1)
+   Sort Key: ttfv.text_value
+   Sort Method: quicksort  Memory: 1291kB
+```
+Exploring and creating indexes for `ticketing_ticket_field_values` would yeld performance results for the current schema
+- `resolutionTime` and `sla` have been implemented on real time calculation, hence the sorting implementation has been duplicated, and is also buggy, which due time constraints, I didn't fix it. These fields should be calculated and stored in the database, perhaps using the `system_field` flag (making it not editable by users). 
+- Computed fields would need proper hooks on `matter_repo.ts` for realtime creation/update, and also the architecture of a backtracking system, with concurrency and completion controls for rolling out changes. Said architecture has been explored in [TASK-STORE-COMPUTED-SLA-DATA.md](TASK-STORE-COMPUTED-SLA-DATA.md)
+
+# Search
+
+All UI/UX and debouncing I fully trusted AI and my manual tests. (I'm not a frontend person).
+
+I paid attention on how multi tokens search input would behave, I decided to go with a broad approach, doing OR on every token, displaying more results than the user would probably want, instead of hiding results users would PROBABLY want.
+
+## Potential improvements 
+
+When testing the final implementation, I noticed that Postgres was not using `pg_trgm` and performing full scans instead. After quick research, it seems that `ILIKE` with `%` searchs (*JOHN*) work with trigram also requires the inverted index. Due to assessment time restriction, I didn't work on this.
+
+# Scalability
+
+## Logical Database partitioning
+
+tickets could be split into different tables or different postgres databases (or schemas) using a logical high order classifier, such as board `ticketing_board`, or non functional order such as `created_at`
+
+### Pros
+
+- Would break down indexes and allows queries to scale on growth
+
+### Cons
+
+- Limited/complex search and sorting capabilites
+- Complex Backups/Restores
+
+## Horizontal database scalability (Preferred)
+
+postgres has very stable replication mechanism which combined to AWS Aurora scalable persistent layers, allows a very elegant horizontal database scalability. However, that comes with the cost of eventual consistency.
+[Amazon Aurora High Availability and Disaster Recovery Features for Global Resilience (PDF)](https://d1.awsstatic.com/Amazon%20Aurora%20High%20Availability%20and%20Disaster%20Recovery%20Features%20for%20Global%20Resilience%20Whitepaper.pdf)
+
+### Pros
+
+- Doesn't require logical changes, apart from dealing with eventual consistency (optmistic locks mostly)
+- Scales infinitely (tm)
+
+### Cons
+
+- Cost
+- Infra migration and Aurora management/observability
+
+## ElasticSearch
+
+ElasticSearch is industry standard for search. Data should be shadowed async to ElasticSearch clusters and search (potentially sorting) should be deletaged. Not explored further due assesment time constraints.
+
+## Integration tests
+
+I like to use [Bruno](https://www.usebruno.com/) for API verification, as it allows the use cases to be in the repository (see `/bruno`)
+
+It has extensive support to scripting and tests, I didn't implement it further due assessment time.
+
+# End Assessment Results
+# ---
+
 # Matter Management System - Take-Home Assessment
 
 Welcome! We're excited to see your approach to building a production-ready system.
