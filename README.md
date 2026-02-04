@@ -2,9 +2,9 @@
 
 ## AI Usage Disclosure
 
-This README has 100% manually written by me.
+**This README has 100% manually written by me.**
 
-This assessment has been completed with support of Claude Sonnet 4.5 model, via Visual Studio Claude Code for VS Code. Anthropic plugin.
+This assessment has been completed with support of **Claude Sonnet 4.5 model**, via Visual Studio Claude Code for VS Code Anthropic plugin.
 
 I have more than 20 years of software engineering experience. In the last 6 months I started leveraging AI into coding, with a mix feeling of amazement and frustration on how I'm more and more being outperformed by AI in general code quality and productivity.
 
@@ -27,7 +27,7 @@ For this assessment, these artefacts have been produced:
 - [TASK-3-SEARCH.md](TASK-3-SEARCH.md)
 - [TASK-3-SEARCH-SUMMARY.md](TASK-3-SEARCH-SUMMARY.md)
 - [TASK-DOCKER-PACKAGE-JSON.md](TASK-DOCKER-PACKAGE-JSON.md) issue I had with Docker
-- [TASK-STORE-COMPUTED-SLA-DATA.md](TASK-STORE-COMPUTED-SLA-DATA.md) exploring storing computing fields, not implemented
+- [TASK-STORE-COMPUTED-SLA-DATA.md](TASK-STORE-COMPUTED-SLA-DATA.md) exploring storing computed fields, not implemented
 
 # Cycle Time Tracking & SLA Calculation
 
@@ -56,11 +56,11 @@ Exploring and creating indexes for `ticketing_ticket_field_values` would yeld pe
 
 All UI/UX and debouncing I fully trusted AI and my manual tests. (I'm not a frontend person).
 
-I paid attention on how multi tokens search input would behave, I decided to go with a broad approach, doing OR on every token, displaying more results than the user would probably want, instead of hiding results users would PROBABLY want.
+I paid attention on how multi tokens search input would behave, I decided to go with a broad approach, performing **OR** on every token, displaying more results than the user would probably want, instead of HIDING results.
 
-## Potential improvements 
+## Improvements 
 
-When testing the final implementation, I noticed that Postgres was not using `pg_trgm` and performing full scans instead. After quick research, it seems that `ILIKE` with `%` searchs (*JOHN*) work with trigram also requires the inverted index. Due to assessment time restriction, I didn't work on this.
+When testing the final implementation, I noticed that Postgres was not using `pg_trgm` and performing full scans instead. After quick research, it seems that `ILIKE` with `%` searchs (\*JOHN\*) work with trigram also requires the inverted index. Due to assessment time restriction, I didn't work on this.
 
 # Scalability
 
@@ -91,6 +91,16 @@ postgres has very stable replication mechanism which combined to AWS Aurora scal
 
 - Cost
 - Infra migration and Aurora management/observability
+
+## postgres EAV to JSONB
+
+postgres also has very elegant way to combine SQL and JSON, which, allied to Aurora horizontal scalability, would be my favourite long term direction for the ticketing storage solution.
+
+To guarantee it would be a perfect replacement for EAV, I leverage Claude to refresh my skills, see:
+- [POSTGRES-JSONB-DEEP-DIVE.md](POSTGRES-JSONB-DEEP-DIVE.md)
+- [POSTGRES-JSONB-DEEP-DIVE-TRANSCRIPT.md](POSTGRES-JSONB-DEEP-DIVE-TRANSCRIPT.md)
+
+That would require a comprehensive migration/backtracking logic, similar to what has been described above on Sorting to deal with computed fields. However it would definitely paid in the long term, as it offers perfect logical scalability for sparse matrix data as the ticketing model is.
 
 ## ElasticSearch
 
